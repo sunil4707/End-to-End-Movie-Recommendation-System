@@ -19,7 +19,7 @@ except:
 # creating a similarity matrix using count vectorizer and cosine similarity
 def create_similarity():
     try:
-        data = pd.read_csv(Artifacts_DIR / "main_data.csv")
+        data = pd.read_csv(Artifacts/ "main_data.csv")
 
         cv = CountVectorizer()
         count_matrix = cv.fit_transform(data['comb'])
