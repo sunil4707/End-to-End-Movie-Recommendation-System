@@ -19,13 +19,18 @@ except:
 # creating a similarity matrix using count vectorizer and cosine similarity
 def create_similarity():
     try:
-        data = pd.read_csv(r"C:\Users\KALYAN\Desktop\Projects\Movie Recommendation System\Artifacts\main_data.csv")
+        data = pd.read_csv(Artifacts_DIR / "main_data.csv")
+
         cv = CountVectorizer()
-        count_matrix = cv.fit_transform(data['comb']) 
+        count_matrix = cv.fit_transform(data['comb'])
+
         similarity = cosine_similarity(count_matrix)
-        return data,similarity
+
+        return data, similarity
+
     except Exception as e:
-        print(e)
+        print("Similarity Error:", e)
+        raise
 
 def rcmd(m):
     m = m.lower()
@@ -55,9 +60,8 @@ def convert_to_list(my_list):
     return my_list
 
 def get_suggestions():
-    data = pd.read_csv('main_data.csv')
+    data = pd.read_csv(Artifacts_DIR / "main_data.csv")
     return list(data['movie_title'].str.capitalize())
-
 app = Flask(__name__)
 
 @app.route("/")
