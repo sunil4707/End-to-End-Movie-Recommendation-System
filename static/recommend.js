@@ -12,7 +12,7 @@ $(function() {
   source.addEventListener('input', inputHandler);
 
   $('.movie-button').on('click',function(){
-    var my_api_key = '5ce2ef2d7c461dea5b4e04900d1c561e';
+    var my_api_key = '3ee14ae4c6cbcd94b456102908a746fb';
     var title = $('.movie').val();
     if (title=="") {
       $('.results').css('display','none');
@@ -26,37 +26,57 @@ $(function() {
 
 // will be invoked when clicking on the recommended movies
 function recommendcard(e){
-  var my_api_key = '5ce2ef2d7c461dea5b4e04900d1c561e';
+  var my_api_key = '3ee14ae4c6cbcd94b456102908a746fb';
   var title = e.getAttribute('title'); 
   load_details(my_api_key,title);
 }
 
 // get the basic details of the movie from the API (based on the name of the movie)
-function load_details(my_api_key,title){
-  $.ajax({
-    type: 'GET',
-    url:'https://api.themoviedb.org/3/search/movie?api_key='+my_api_key+'&query='+title,
 
-    success: function(movie){
-      if(movie.results.length<1){
-        $('.fail').css('display','block');
-        $('.results').css('display','none');
-        $("#loader").delay(500).fadeOut();
-      }
-      else{
-        $("#loader").fadeIn();
-        $('.fail').css('display','none');
-        $('.results').delay(1000).css('display','block');
-        var movie_id = movie.results[0].id;
-        var movie_title = movie.results[0].original_title;
-        movie_recs(movie_title,movie_id,my_api_key);
-      }
-    },
-    error: function(){
-      alert('Invalid Request');
-      $("#loader").delay(500).fadeOut();
-    },
-  });
+function load_details(my_api_key, title) {
+    $("#loader").show();
+
+    $.ajax({
+        type: "GET",
+        url: "https://api.themoviedb.org/3/search/movie",
+        data: {
+            api_key: my_api_key,
+            query: title
+        },
+        dataType: "json",
+
+        success: function(movie) {
+            if (!movie.results || movie.results.length === 0) {
+                $(".fail").show();
+                $(".results").hide();
+                $("#loader").fadeOut();
+                return;
+            }
+
+            $(".fail").hide();
+
+            var movie_id = movie.results[0].id;
+            var movie_title = movie.results[0].original_title;
+
+            movie_recs(movie_title, movie_id, my_api_key);
+        },
+
+        error: function(xhr, status, error) {
+            console.error("TMDB request failed");
+            console.error("HTTP status:", xhr.status);
+            console.error("jQuery status:", status);
+            console.error("Error:", error);
+            console.error("Response:", xhr.responseText);
+
+            alert(
+                "TMDB request failed. HTTP: " +
+                xhr.status +
+                ". Check the browser console for details."
+            );
+
+            $("#loader").fadeOut();
+        }
+    });
 }
 
 // passing the movie name to get the similar movies from python's flask
@@ -236,10 +256,13 @@ function get_movie_posters(arr,my_api_key){
       success: function(m_data){
         arr_poster_list.push('https://image.tmdb.org/t/p/original'+m_data.results[0].poster_path);
       },
-      error: function(){
-        alert("Invalid Request!");
-        $("#loader").delay(500).fadeOut();
-      },
+      error: function(xhr, status, error){
+    console.log("HTTP Status:", xhr.status);
+    console.log("Error:", error);
+    console.log("Response:", xhr.responseText);
+
+    alert("TMDB Error: " + xhr.status + " - " + error);
+},
     })
   }
   return arr_poster_list;

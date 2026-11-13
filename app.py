@@ -9,48 +9,60 @@ from flask import Flask, render_template, request
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
 
-# loading the dataset and the trained model
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+ARTIFACTS_DIR = BASE_DIR / "Artifacts"
+
 try:
-    clf = pickle.load(open("./Artifacts\nlp_model.pkl", 'rb'))
-    vectorizer = pickle.load(open("./Artifacts\tranform.pkl",'rb'))
-except:
-    print("Error in loading Artifacts")
+    with open(ARTIFACTS_DIR / "nlp_model.pkl", "rb") as f:
+        clf = pickle.load(f)
 
-# creating a similarity matrix using count vectorizer and cosine similarity
+    with open(ARTIFACTS_DIR / "tranform.pkl", "rb") as f:
+        vectorizer = pickle.load(f)
+
+    print("SUCCESS: Artifacts loaded!")
+
+except Exception as e:
+    print("ARTIFACT ERROR:", repr(e))
+    raise
 def create_similarity():
-    try:
-        data = pd.read_csv(Artifacts/ "main_data.csv")
+    data = pd.read_csv(ARTIFACTS_DIR / "main_data.csv")
 
-        cv = CountVectorizer()
-        count_matrix = cv.fit_transform(data['comb'])
+    cv = CountVectorizer()
+    count_matrix = cv.fit_transform(data['comb'])
 
-        similarity = cosine_similarity(count_matrix)
+    similarity_matrix = cosine_similarity(count_matrix)
 
-        return data, similarity
+    return data, similarity_matrix
 
-    except Exception as e:
-        print("Similarity Error:", e)
-        raise
+movie_data = None
+similarity_matrix = None
 
 def rcmd(m):
+    global movie_data, similarity_matrix
+
+    if movie_data is None:
+        movie_data, similarity_matrix = create_similarity()
+
     m = m.lower()
-    try:
-        data.head()
-        similarity.shape 
-    except:
-        data, similarity = create_similarity()
-    if m not in data['movie_title'].unique():
-        return('Sorry! The movie you requested is not in our database. Please check the spelling or try with some other movies')
-    else:
-        i = data.loc[data['movie_title']==m].index[0]
-        lst = list(enumerate(similarity[i]))
-        lst = sorted(lst, key = lambda x:x[1] ,reverse=True)
-        lst = lst[1:11] # excluding first item since it is the requested movie itself
-        l = []
-        for i in range(len(lst)):
-            a = lst[i][0]
-            l.append(data['movie_title'][a])
-        return l
+
+    if m not in movie_data['movie_title'].unique():
+        return "Sorry! Movie not found in database."
+
+    i = movie_data.index[
+        movie_data['movie_title'] == m
+    ][0]
+
+    lst = list(enumerate(similarity_matrix[i]))
+    lst = sorted(lst, key=lambda x: x[1], reverse=True)
+
+    lst = lst[1:11]
+
+    return [
+        movie_data['movie_title'].iloc[item[0]]
+        for item in lst
+    ]
     
 # converting list of string to list (eg. "["abc","def"]" to ["abc","def"])
 def convert_to_list(my_list):
@@ -60,8 +72,9 @@ def convert_to_list(my_list):
     return my_list
 
 def get_suggestions():
-    data = pd.read_csv("main_data.csv")
+    data = pd.read_csv(ARTIFACTS_DIR / "main_data.csv")
     return list(data['movie_title'].str.capitalize())
+
 app = Flask(__name__)
 
 @app.route("/")
@@ -70,15 +83,25 @@ def home():
     suggestions = get_suggestions()
     return render_template('home.html',suggestions=suggestions)
 
-@app.route("/similarity",methods=["POST"])
+
+@app.route("/similarity", methods=["POST"])
 def similarity():
-    movie = request.form['name']
-    rc = rcmd(movie)
-    if type(rc)==type('string'):
-        return rc
-    else:
-        m_str="---".join(rc)
-        return m_str
+    movie = request.form.get('name', '').strip()
+
+    if not movie:
+        return "Please enter a movie name.", 400
+
+    try:
+        rc = rcmd(movie)
+
+        if isinstance(rc, str):
+            return rc
+
+        return "---".join(rc)
+
+    except Exception as e:
+        print("Recommendation Error:", repr(e))
+        return "Error generating recommendations.", 500
 
 @app.route("/recommend",methods=["POST"])
 def recommend():
@@ -133,9 +156,59 @@ def recommend():
     cast_details = {cast_names[i]:[cast_ids[i], cast_profiles[i], cast_bdays[i], cast_places[i], cast_bios[i]] for i in range(len(cast_places))}
 
     # web scraping to get user reviews from IMDB site
-    sauce = urllib.request.urlopen('https://www.imdb.com/title/{}/reviews?ref_=tt_ov_rt'.format(imdb_id)).read()
-    soup = bs.BeautifulSoup(sauce,'lxml')
-    soup_result = soup.find_all("div",{"class":"text show-more__control"})
+
+    reviews = {}
+
+    
+    reviews = {}
+
+    try:
+        sauce = urllib.request.urlopen(
+            'https://www.imdb.com/title/{}/reviews?ref_=tt_ov_rt'.format(imdb_id),
+            timeout=10
+        ).read()
+
+        soup = BeautifulSoup(sauce, 'html.parser')
+
+        soup_result = soup.find_all(
+            "div",
+            {"class": "text show-more__control"}
+        )
+
+        for review in soup_result:
+            review_text = review.get_text(strip=True)
+
+            if not review_text:
+                continue
+
+            # Keep your existing sentiment prediction logic here.
+            # Example:
+            # prediction = clf.predict(
+            #     vectorizer.transform([review_text])
+            # )[0]
+            # reviews[review_text] = prediction
+
+    except Exception as e:
+        print("IMDb reviews unavailable:", e)
+        reviews = {}
+
+    return render_template(
+    'recommend.html',
+    title=title,
+    poster=poster,
+    overview=overview,
+    vote_average=vote_average,
+    vote_count=vote_count,
+    genres=genres,
+    release_date=release_date,
+    runtime=runtime,
+    status=status,
+    reviews=reviews,
+    cast_details=cast_details
+    # Preserve your other existing arguments.
+)
+
+
 
     reviews_list = [] # list of reviews
     reviews_status = [] # list of comments (good or bad)
